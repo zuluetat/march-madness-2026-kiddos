@@ -1,0 +1,877 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<title>March Madness 2026 - Bracket Picker</title>
+<style>
+  :root {
+    --color-bg: #f0f4f8;
+    --color-text: #1a202c;
+    --color-header-bg: #2d3748;
+    --color-header-text: #fff;
+    --round-transition-bg: #1a202c;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html, body {
+    width: 100%; height: 100%;
+    overflow: hidden;
+    overscroll-behavior: none;
+    touch-action: manipulation;
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-touch-callout: none;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: var(--color-bg);
+    color: var(--color-text);
+  }
+
+  /* HEADER */
+  #header {
+    position: fixed; top: 0; left: 0; right: 0;
+    height: 64px;
+    background: var(--color-header-bg);
+    color: var(--color-header-text);
+    display: flex; align-items: center; justify-content: center;
+    flex-direction: column;
+    z-index: 10;
+    padding: 4px 16px;
+  }
+  #round-name {
+    font-size: 22px; font-weight: 800;
+    letter-spacing: 0.5px;
+  }
+  #progress-info {
+    font-size: 14px; font-weight: 500;
+    opacity: 0.85;
+    margin-top: 2px;
+  }
+
+  /* MATCHUP AREA */
+  #matchup-area {
+    position: fixed;
+    top: 64px; left: 0; right: 0; bottom: 0;
+    display: flex;
+    align-items: stretch;
+    gap: 8px;
+    padding: 8px;
+  }
+
+  .team-card {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    border-radius: 24px;
+    cursor: pointer;
+    touch-action: manipulation;
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+    position: relative;
+    overflow: hidden;
+    border: 4px solid rgba(255,255,255,0.3);
+  }
+  .team-card:active {
+    transform: scale(1.03);
+  }
+  .team-card .emoji {
+    font-size: 140px;
+    line-height: 1.1;
+    filter: drop-shadow(0 4px 8px rgba(0,0,0,0.15));
+  }
+  .team-card .team-name {
+    font-size: 26px;
+    font-weight: 800;
+    margin-top: 12px;
+    text-align: center;
+    color: rgba(0,0,0,0.8);
+    text-shadow: 0 1px 2px rgba(255,255,255,0.4);
+    padding: 0 8px;
+    line-height: 1.2;
+  }
+  .team-card .seed-label {
+    font-size: 13px;
+    font-weight: 600;
+    opacity: 0.5;
+    margin-top: 4px;
+  }
+
+  /* Pick animation */
+  .team-card.picked {
+    animation: bounce-win 0.45s ease;
+    z-index: 5;
+  }
+  .team-card.not-picked {
+    animation: fade-out 0.35s ease forwards;
+  }
+
+  @keyframes bounce-win {
+    0% { transform: scale(1); }
+    40% { transform: scale(1.12); }
+    70% { transform: scale(0.97); }
+    100% { transform: scale(1); }
+  }
+  @keyframes fade-out {
+    0% { opacity: 1; transform: scale(1); }
+    100% { opacity: 0.15; transform: scale(0.92); }
+  }
+
+  /* ROUND TRANSITION SCREEN */
+  #round-transition {
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: var(--round-transition-bg);
+    color: #fff;
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+  }
+  #round-transition.active {
+    display: flex;
+  }
+  #round-transition .title {
+    font-size: 42px;
+    font-weight: 900;
+    text-align: center;
+    animation: scale-in 0.5s ease;
+  }
+  #round-transition .subtitle {
+    font-size: 22px;
+    font-weight: 600;
+    margin-top: 12px;
+    opacity: 0.8;
+  }
+  /* Celebration dots for round transition */
+  .celebration-dot {
+    position: absolute;
+    border-radius: 50%;
+    animation: celebrate-dot 1.8s ease-out forwards;
+  }
+  @keyframes celebrate-dot {
+    0% { transform: scale(0) translate(0, 0); opacity: 1; }
+    50% { opacity: 1; }
+    100% { transform: scale(1) translate(var(--dx), var(--dy)); opacity: 0; }
+  }
+
+  @keyframes scale-in {
+    0% { transform: scale(0.5); opacity: 0; }
+    100% { transform: scale(1); opacity: 1; }
+  }
+
+  /* CHAMPION SCREEN */
+  #champion-screen {
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+    color: #fff;
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    z-index: 200;
+  }
+  #champion-screen.active {
+    display: flex;
+  }
+  #champion-screen .champ-emoji {
+    font-size: 160px;
+    animation: champ-pulse 1.5s ease infinite;
+  }
+  #champion-screen .champ-label {
+    font-size: 48px;
+    font-weight: 900;
+    margin-top: 8px;
+    background: linear-gradient(90deg, #f6d365, #fda085, #f6d365);
+    background-size: 200% 100%;
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    animation: rainbow-shift 2s linear infinite;
+  }
+  #champion-screen .champ-team {
+    font-size: 32px;
+    font-weight: 700;
+    margin-top: 8px;
+  }
+  #champion-screen .champ-action {
+    margin-top: 32px;
+    font-size: 18px;
+    opacity: 0.7;
+  }
+  @keyframes champ-pulse {
+    0%, 100% { transform: scale(1) rotate(0deg); }
+    25% { transform: scale(1.1) rotate(-5deg); }
+    50% { transform: scale(1.05) rotate(0deg); }
+    75% { transform: scale(1.1) rotate(5deg); }
+  }
+  @keyframes rainbow-shift {
+    0% { background-position: 0% 50%; }
+    100% { background-position: 200% 50%; }
+  }
+
+  /* CONFETTI PARTICLES */
+  .confetti {
+    position: fixed;
+    z-index: 50;
+    pointer-events: none;
+    animation: confetti-fall var(--duration) ease-out forwards;
+  }
+  @keyframes confetti-fall {
+    0% {
+      transform: translate(0, 0) rotate(0deg);
+      opacity: 1;
+    }
+    100% {
+      transform: translate(var(--tx), var(--ty)) rotate(var(--rot));
+      opacity: 0;
+    }
+  }
+
+  /* BRACKET / PRINT VIEW */
+  #bracket-view {
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: #fff;
+    color: #1a202c;
+    display: none;
+    flex-direction: column;
+    overflow: auto;
+    z-index: 300;
+    padding: 16px;
+  }
+  #bracket-view.active {
+    display: flex;
+  }
+  #bracket-view h1 {
+    text-align: center;
+    font-size: 24px;
+    margin-bottom: 16px;
+    font-weight: 900;
+  }
+  .bracket-container {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex: 1;
+    overflow: auto;
+    min-height: 0;
+  }
+  .bracket-side {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+  }
+  .bracket-round {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-around;
+    min-width: 130px;
+    padding: 2px 4px;
+  }
+  .bracket-slot {
+    font-size: 10px;
+    padding: 2px 4px;
+    margin: 1px 0;
+    border: 1px solid #ddd;
+    border-radius: 3px;
+    white-space: nowrap;
+    line-height: 1.3;
+    background: #fafafa;
+  }
+  .bracket-slot.winner {
+    font-weight: 800;
+    background: #fef9c3;
+    border-color: #d4a017;
+  }
+  .bracket-final-four {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-width: 150px;
+    padding: 0 8px;
+  }
+  .bracket-ff-game {
+    margin: 8px 0;
+    text-align: center;
+  }
+  .bracket-champion {
+    text-align: center;
+    margin: 12px 0;
+    font-size: 14px;
+    font-weight: 900;
+    padding: 6px 12px;
+    border: 2px solid #d4a017;
+    background: #fef9c3;
+    border-radius: 6px;
+  }
+  .bracket-buttons {
+    display: flex;
+    gap: 16px;
+    justify-content: center;
+    padding: 16px;
+  }
+  .bracket-buttons button {
+    padding: 12px 28px;
+    font-size: 18px;
+    font-weight: 700;
+    border: none;
+    border-radius: 12px;
+    cursor: pointer;
+    touch-action: manipulation;
+  }
+  #btn-print {
+    background: #2d3748;
+    color: #fff;
+  }
+  #btn-restart {
+    background: #e2e8f0;
+    color: #2d3748;
+  }
+
+  /* PRINT STYLES */
+  @media print {
+    body { overflow: visible !important; }
+    #header, #matchup-area, #round-transition, #champion-screen { display: none !important; }
+    #bracket-view {
+      position: static !important;
+      overflow: visible !important;
+      display: flex !important;
+      padding: 8px;
+    }
+    .bracket-buttons { display: none !important; }
+    .bracket-slot { font-size: 9px; border-color: #999; }
+    .bracket-slot.winner { background: #fef9c3 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    @page { size: landscape; margin: 0.3in; }
+  }
+</style>
+</head>
+<body>
+
+<div id="header">
+  <div id="round-name">Round of 64</div>
+  <div id="progress-info">Game 1 of 32</div>
+</div>
+
+<div id="matchup-area">
+  <div class="team-card" id="card-left" onclick="pickTeam('left')">
+    <div class="emoji" id="emoji-left"></div>
+    <div class="team-name" id="name-left"></div>
+    <div class="seed-label" id="seed-left"></div>
+  </div>
+  <div class="team-card" id="card-right" onclick="pickTeam('right')">
+    <div class="emoji" id="emoji-right"></div>
+    <div class="team-name" id="name-right"></div>
+    <div class="seed-label" id="seed-right"></div>
+  </div>
+</div>
+
+<div id="round-transition">
+  <div class="title" id="transition-title"></div>
+  <div class="subtitle" id="transition-subtitle"></div>
+</div>
+
+<div id="champion-screen">
+  <div class="champ-emoji" id="champ-emoji"></div>
+  <div class="champ-label">CHAMPION!</div>
+  <div class="champ-team" id="champ-team"></div>
+  <div class="champ-action">Tap anywhere to see your bracket</div>
+</div>
+
+<div id="bracket-view">
+  <h1>March Madness 2026 - My Bracket</h1>
+  <div class="bracket-container" id="bracket-container"></div>
+  <div class="bracket-buttons">
+    <button id="btn-print" onclick="window.print()">Print My Bracket</button>
+    <button id="btn-restart" onclick="location.reload()">Start Over</button>
+  </div>
+</div>
+
+<script>
+(() => {
+  // ===== DATA =====
+  const regions = {
+    East: [
+      { seed: 1, name: 'Duke Blue Devils', emoji: '\u{1F608}' },
+      { seed: 16, name: 'Siena Saints', emoji: '\u{1F607}' },
+      { seed: 8, name: 'Ohio State Buckeyes', emoji: '\u{1F330}' },
+      { seed: 9, name: 'TCU Horned Frogs', emoji: '\u{1F438}' },
+      { seed: 5, name: "St. John's Red Storm", emoji: '\u{1F32A}\uFE0F' },
+      { seed: 12, name: 'Northern Iowa Panthers', emoji: '\u{1F406}' },
+      { seed: 4, name: 'Kansas Jayhawks', emoji: '\u{1F426}' },
+      { seed: 13, name: 'California Baptist Lancers', emoji: '\u2694\uFE0F' },
+      { seed: 6, name: 'Louisville Cardinals', emoji: '\u{1F426}' },
+      { seed: 11, name: 'South Florida Bulls', emoji: '\u{1F402}' },
+      { seed: 3, name: 'Michigan State Spartans', emoji: '\u2694\uFE0F' },
+      { seed: 14, name: 'North Dakota State Bison', emoji: '\u{1F9AC}' },
+      { seed: 7, name: 'UCLA Bruins', emoji: '\u{1F43B}' },
+      { seed: 10, name: 'UCF Knights', emoji: '\u{1F6E1}\uFE0F' },
+      { seed: 2, name: 'UConn Huskies', emoji: '\u{1F43A}' },
+      { seed: 15, name: 'Furman Paladins', emoji: '\u{1F6E1}\uFE0F' },
+    ],
+    West: [
+      { seed: 1, name: 'Arizona Wildcats', emoji: '\u{1F431}' },
+      { seed: 16, name: 'LIU Sharks', emoji: '\u{1F988}' },
+      { seed: 8, name: 'Villanova Wildcats', emoji: '\u{1F431}' },
+      { seed: 9, name: 'Utah State Aggies', emoji: '\u{1F404}' },
+      { seed: 5, name: 'Wisconsin Badgers', emoji: '\u{1F9A1}' },
+      { seed: 12, name: 'High Point Panthers', emoji: '\u{1F406}' },
+      { seed: 4, name: 'Arkansas Razorbacks', emoji: '\u{1F417}' },
+      { seed: 13, name: 'Hawaii Rainbow Warriors', emoji: '\u{1F308}' },
+      { seed: 6, name: 'BYU Cougars', emoji: '\u{1F406}' },
+      { seed: 11, name: 'NC State Wolfpack', emoji: '\u{1F43A}' },
+      { seed: 3, name: 'Gonzaga Bulldogs', emoji: '\u{1F436}' },
+      { seed: 14, name: 'Kennesaw State Owls', emoji: '\u{1F989}' },
+      { seed: 7, name: 'Miami Hurricanes', emoji: '\u{1F300}' },
+      { seed: 10, name: 'Missouri Tigers', emoji: '\u{1F42F}' },
+      { seed: 2, name: 'Purdue Boilermakers', emoji: '\u{1F528}' },
+      { seed: 15, name: 'Queens Royals', emoji: '\u{1F451}' },
+    ],
+    South: [
+      { seed: 1, name: 'Florida Gators', emoji: '\u{1F40A}' },
+      { seed: 16, name: 'Lehigh Mountain Hawks', emoji: '\u{1F985}' },
+      { seed: 8, name: 'Clemson Tigers', emoji: '\u{1F42F}' },
+      { seed: 9, name: 'Iowa Hawkeyes', emoji: '\u{1F985}' },
+      { seed: 5, name: 'Vanderbilt Commodores', emoji: '\u2693' },
+      { seed: 12, name: 'McNeese Cowboys', emoji: '\u{1F920}' },
+      { seed: 4, name: 'Nebraska Cornhuskers', emoji: '\u{1F33D}' },
+      { seed: 13, name: 'Troy Trojans', emoji: '\u2694\uFE0F' },
+      { seed: 6, name: 'North Carolina Tar Heels', emoji: '\u{1F40F}' },
+      { seed: 11, name: 'VCU Rams', emoji: '\u{1F40F}' },
+      { seed: 3, name: 'Illinois Fighting Illini', emoji: '\u2694\uFE0F' },
+      { seed: 14, name: 'Penn Quakers', emoji: '\u{1F3A9}' },
+      { seed: 7, name: "Saint Mary's Gaels", emoji: '\u2618\uFE0F' },
+      { seed: 10, name: 'Texas A&M Aggies', emoji: '\u{1F404}' },
+      { seed: 2, name: 'Houston Cougars', emoji: '\u{1F406}' },
+      { seed: 15, name: 'Idaho Vandals', emoji: '\u2694\uFE0F' },
+    ],
+    Midwest: [
+      { seed: 1, name: 'Michigan Wolverines', emoji: '\u{1F43A}' },
+      { seed: 16, name: 'Howard Bison', emoji: '\u{1F9AC}' },
+      { seed: 8, name: 'Georgia Bulldogs', emoji: '\u{1F436}' },
+      { seed: 9, name: 'Saint Louis Billikens', emoji: '\u{1F60A}' },
+      { seed: 5, name: 'Texas Tech Red Raiders', emoji: '\u{1F3F4}\u200D\u2620\uFE0F' },
+      { seed: 12, name: 'Akron Zips', emoji: '\u26A1' },
+      { seed: 4, name: 'Alabama Crimson Tide', emoji: '\u{1F30A}' },
+      { seed: 13, name: 'Hofstra Pride', emoji: '\u{1F981}' },
+      { seed: 6, name: 'Tennessee Volunteers', emoji: '\u{1F3D4}\uFE0F' },
+      { seed: 11, name: 'SMU Mustangs', emoji: '\u{1F434}' },
+      { seed: 3, name: 'Virginia Cavaliers', emoji: '\u{1F5E1}\uFE0F' },
+      { seed: 14, name: 'Wright State Raiders', emoji: '\u2694\uFE0F' },
+      { seed: 7, name: 'Kentucky Wildcats', emoji: '\u{1F431}' },
+      { seed: 10, name: 'Santa Clara Broncos', emoji: '\u{1F434}' },
+      { seed: 2, name: 'Iowa State Cyclones', emoji: '\u{1F32A}\uFE0F' },
+      { seed: 15, name: 'Tennessee State Tigers', emoji: '\u{1F42F}' },
+    ],
+  };
+
+  // Color palette pairs - equally appealing, no bias
+  const colorPairs = [
+    ['#5B8DEF', '#EF7B5B'],  // blue / coral
+    ['#6BCB77', '#CB6BA6'],  // green / mauve
+    ['#FFB347', '#7B68EE'],  // amber / medium slate
+    ['#45C4B0', '#E8596E'],  // teal / rose
+    ['#9B87F5', '#F5C542'],  // lavender / gold
+    ['#FF8A65', '#42A5F5'],  // peach / sky
+    ['#66BB6A', '#AB47BC'],  // lime / orchid
+    ['#26C6DA', '#EC407A'],  // cyan / pink
+    ['#8D6E63', '#5C6BC0'],  // brown / indigo
+    ['#FFA726', '#26A69A'],  // orange / sea green
+    ['#EF5350', '#66BB6A'],  // red / green
+    ['#7E57C2', '#FFB74D'],  // purple / melon
+    ['#29B6F6', '#FF7043'],  // light blue / deep orange
+    ['#9CCC65', '#7986CB'],  // yellow-green / blue-grey
+    ['#D4E157', '#CE93D8'],  // lime / light purple
+    ['#4DB6AC', '#F06292'],  // teal / pink
+  ];
+
+  const roundNames = [
+    'Round of 64',
+    'Round of 32',
+    'Sweet 16',
+    'Elite 8',
+    'Final Four',
+    'Championship',
+  ];
+  const gamesPerRound = [32, 16, 8, 4, 2, 1];
+
+  // ===== STATE =====
+  let currentRound = 0;
+  let currentMatchup = 0;
+  let picking = false;
+
+  // Build initial matchups from regions
+  // Each round's matchups: array of { teamA, teamB }
+  // Results stored per round: winners feed into next round
+  const allRoundMatchups = [];
+  const allRoundResults = []; // winners for each round
+
+  // Build round of 64 matchups grouped by region
+  const regionOrder = ['East', 'West', 'South', 'Midwest'];
+  const round64 = [];
+  for (const rName of regionOrder) {
+    const teams = regions[rName];
+    for (let i = 0; i < teams.length; i += 2) {
+      round64.push({ teamA: { ...teams[i], region: rName }, teamB: { ...teams[i + 1], region: rName } });
+    }
+  }
+  allRoundMatchups.push(round64);
+
+  const buildNextRound = (prevWinners) => {
+    const matchups = [];
+    for (let i = 0; i < prevWinners.length; i += 2) {
+      matchups.push({ teamA: prevWinners[i], teamB: prevWinners[i + 1] });
+    }
+    return matchups;
+  };
+
+  // ===== DOM =====
+  const $roundName = document.getElementById('round-name');
+  const $progress = document.getElementById('progress-info');
+  const $cardLeft = document.getElementById('card-left');
+  const $cardRight = document.getElementById('card-right');
+  const $emojiLeft = document.getElementById('emoji-left');
+  const $emojiRight = document.getElementById('emoji-right');
+  const $nameLeft = document.getElementById('name-left');
+  const $nameRight = document.getElementById('name-right');
+  const $seedLeft = document.getElementById('seed-left');
+  const $seedRight = document.getElementById('seed-right');
+  const $transition = document.getElementById('round-transition');
+  const $transTitle = document.getElementById('transition-title');
+  const $transSub = document.getElementById('transition-subtitle');
+  const $champScreen = document.getElementById('champion-screen');
+  const $champEmoji = document.getElementById('champ-emoji');
+  const $champTeam = document.getElementById('champ-team');
+  const $bracketView = document.getElementById('bracket-view');
+
+  // ===== RANDOMIZE SIDES =====
+  // For each matchup, randomly decide which team goes left vs right
+  // Store the mapping so we know which team the user tapped
+  let leftTeam = null;
+  let rightTeam = null;
+
+  const showMatchup = () => {
+    const matchups = allRoundMatchups[currentRound];
+    if (!matchups || currentMatchup >= matchups.length) return;
+
+    const m = matchups[currentMatchup];
+    // Randomize sides: 50/50 chance team A is on left or right
+    const swapped = Math.random() < 0.5;
+    leftTeam = swapped ? m.teamB : m.teamA;
+    rightTeam = swapped ? m.teamA : m.teamB;
+
+    // Pick color pair
+    const pairIdx = currentMatchup % colorPairs.length;
+    const [colorA, colorB] = colorPairs[pairIdx];
+
+    $cardLeft.style.background = colorA;
+    $cardRight.style.background = colorB;
+
+    $emojiLeft.textContent = leftTeam.emoji;
+    $emojiRight.textContent = rightTeam.emoji;
+    $nameLeft.textContent = leftTeam.name;
+    $nameRight.textContent = rightTeam.name;
+    $seedLeft.textContent = `#${leftTeam.seed}`;
+    $seedRight.textContent = `#${rightTeam.seed}`;
+
+    // Reset card classes
+    $cardLeft.classList.remove('picked', 'not-picked');
+    $cardRight.classList.remove('picked', 'not-picked');
+    $cardLeft.style.opacity = '';
+    $cardRight.style.opacity = '';
+
+    // Update header
+    const total = gamesPerRound[currentRound];
+    $roundName.textContent = roundNames[currentRound];
+
+    const regionLabel = currentRound < 4 ? ` \u2014 ${leftTeam.region} Region` : '';
+    $progress.textContent = `Game ${currentMatchup + 1} of ${total}${regionLabel}`;
+
+    picking = false;
+  };
+
+  // ===== CONFETTI =====
+  const spawnConfetti = (originX, originY) => {
+    const colors = ['#FFD700', '#FF4444', '#4488FF', '#44DD44', '#AA44FF', '#FF69B4', '#FF8C00', '#00CED1'];
+    const count = 35;
+    for (let i = 0; i < count; i++) {
+      const el = document.createElement('div');
+      el.className = 'confetti';
+      const size = 6 + Math.random() * 8;
+      const isCircle = Math.random() > 0.4;
+      el.style.width = size + 'px';
+      el.style.height = size + 'px';
+      el.style.borderRadius = isCircle ? '50%' : '2px';
+      el.style.background = colors[Math.floor(Math.random() * colors.length)];
+      el.style.left = originX + 'px';
+      el.style.top = originY + 'px';
+      const tx = (Math.random() - 0.5) * 400;
+      const ty = 200 + Math.random() * 350;
+      const rot = Math.random() * 720;
+      const dur = 0.8 + Math.random() * 0.7;
+      el.style.setProperty('--tx', tx + 'px');
+      el.style.setProperty('--ty', ty + 'px');
+      el.style.setProperty('--rot', rot + 'deg');
+      el.style.setProperty('--duration', dur + 's');
+      document.body.appendChild(el);
+      el.addEventListener('animationend', () => el.remove());
+    }
+  };
+
+  // ===== CELEBRATION DOTS for round transition =====
+  const spawnCelebrationDots = (container) => {
+    const colors = ['#FFD700', '#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FFEAA7', '#DDA0DD', '#98D8C8'];
+    for (let i = 0; i < 40; i++) {
+      const dot = document.createElement('div');
+      dot.className = 'celebration-dot';
+      const size = 8 + Math.random() * 16;
+      dot.style.width = size + 'px';
+      dot.style.height = size + 'px';
+      dot.style.background = colors[Math.floor(Math.random() * colors.length)];
+      dot.style.left = '50%';
+      dot.style.top = '50%';
+      const angle = Math.random() * Math.PI * 2;
+      const dist = 100 + Math.random() * 250;
+      dot.style.setProperty('--dx', Math.cos(angle) * dist + 'px');
+      dot.style.setProperty('--dy', Math.sin(angle) * dist + 'px');
+      dot.style.animationDelay = Math.random() * 0.3 + 's';
+      container.appendChild(dot);
+      dot.addEventListener('animationend', () => dot.remove());
+    }
+  };
+
+  // ===== PICK HANDLER =====
+  window.pickTeam = (side) => {
+    if (picking) return;
+    picking = true;
+
+    const winner = side === 'left' ? leftTeam : rightTeam;
+    const pickedCard = side === 'left' ? $cardLeft : $cardRight;
+    const otherCard = side === 'left' ? $cardRight : $cardLeft;
+
+    pickedCard.classList.add('picked');
+    otherCard.classList.add('not-picked');
+
+    // Confetti from the center of the picked card
+    const rect = pickedCard.getBoundingClientRect();
+    spawnConfetti(rect.left + rect.width / 2, rect.top + rect.height / 2);
+
+    // Store result
+    if (!allRoundResults[currentRound]) allRoundResults[currentRound] = [];
+    allRoundResults[currentRound].push(winner);
+
+    setTimeout(() => {
+      currentMatchup++;
+      const total = gamesPerRound[currentRound];
+
+      if (currentMatchup >= total) {
+        // Round complete
+        if (currentRound === 5) {
+          // Championship decided!
+          showChampion(winner);
+        } else {
+          showRoundTransition();
+        }
+      } else {
+        showMatchup();
+      }
+    }, 800);
+  };
+
+  // ===== ROUND TRANSITION =====
+  const showRoundTransition = () => {
+    const nextRound = currentRound + 1;
+    $transTitle.textContent = `${roundNames[currentRound]} Complete!`;
+    $transSub.textContent = `Up next: ${roundNames[nextRound]}`;
+    $transition.classList.add('active');
+
+    spawnCelebrationDots($transition);
+
+    setTimeout(() => {
+      $transition.classList.remove('active');
+      // Build next round matchups
+      const winners = allRoundResults[currentRound];
+      allRoundMatchups.push(buildNextRound(winners));
+      currentRound = nextRound;
+      currentMatchup = 0;
+      showMatchup();
+    }, 2000);
+  };
+
+  // ===== CHAMPION =====
+  const showChampion = (winner) => {
+    $champEmoji.textContent = winner.emoji;
+    $champTeam.textContent = winner.name;
+    $champScreen.classList.add('active');
+
+    // Spawn confetti bursts
+    const burst = () => {
+      spawnConfetti(window.innerWidth * 0.3, window.innerHeight * 0.4);
+      spawnConfetti(window.innerWidth * 0.7, window.innerHeight * 0.4);
+    };
+    burst();
+    setTimeout(burst, 600);
+    setTimeout(burst, 1200);
+
+    // Tap to see bracket
+    const handler = () => {
+      $champScreen.classList.remove('active');
+      $champScreen.removeEventListener('click', handler);
+      showBracket();
+    };
+    setTimeout(() => {
+      $champScreen.addEventListener('click', handler);
+    }, 2000);
+  };
+
+  // ===== BRACKET VIEW =====
+  const showBracket = () => {
+    document.getElementById('header').style.display = 'none';
+    document.getElementById('matchup-area').style.display = 'none';
+    buildBracketHTML();
+    $bracketView.classList.add('active');
+  };
+
+  const buildBracketHTML = () => {
+    const container = document.getElementById('bracket-container');
+    container.innerHTML = '';
+
+    // We'll build a simplified bracket: region columns then final four + champ
+    // Left side: East, West -> Final Four left
+    // Right side: South, Midwest -> Final Four right
+    // Center: Championship
+
+    const wrapper = document.createElement('div');
+    wrapper.style.cssText = 'display:flex; align-items:center; justify-content:center; width:100%; gap:4px; font-size:10px;';
+
+    const makeRegionBracket = (regionName, regionIndex) => {
+      const regionDiv = document.createElement('div');
+      regionDiv.style.cssText = 'display:flex; flex-direction:row; align-items:center;';
+
+      const regionTeams = regions[regionName];
+      // R64 -> R32 -> S16 -> E8
+      const rounds = [0, 1, 2, 3]; // indices into allRoundResults
+      const gamesInRegion = [8, 4, 2, 1];
+      const startGame = regionIndex * 8; // offset in R64
+
+      for (let r = 0; r < 4; r++) {
+        const col = document.createElement('div');
+        col.style.cssText = 'display:flex; flex-direction:column; justify-content:space-around; min-width:120px; padding:1px 2px;';
+
+        const numGames = gamesInRegion[r];
+        let gameOffset;
+        if (r === 0) {
+          gameOffset = regionIndex * 8;
+        } else if (r === 1) {
+          gameOffset = regionIndex * 4;
+        } else if (r === 2) {
+          gameOffset = regionIndex * 2;
+        } else {
+          gameOffset = regionIndex;
+        }
+
+        for (let g = 0; g < numGames; g++) {
+          const gameIdx = gameOffset + g;
+          const matchup = allRoundMatchups[r] ? allRoundMatchups[r][gameIdx] : null;
+          const winner = allRoundResults[r] ? allRoundResults[r][gameIdx] : null;
+
+          if (matchup) {
+            const slotA = document.createElement('div');
+            slotA.className = 'bracket-slot' + (winner && winner.name === matchup.teamA.name ? ' winner' : '');
+            slotA.textContent = `(${matchup.teamA.seed}) ${matchup.teamA.name} ${matchup.teamA.emoji}`;
+
+            const slotB = document.createElement('div');
+            slotB.className = 'bracket-slot' + (winner && winner.name === matchup.teamB.name ? ' winner' : '');
+            slotB.textContent = `(${matchup.teamB.seed}) ${matchup.teamB.name} ${matchup.teamB.emoji}`;
+
+            const pair = document.createElement('div');
+            pair.style.cssText = 'margin:2px 0; border-left:2px solid #ccc; padding-left:3px;';
+            pair.appendChild(slotA);
+            pair.appendChild(slotB);
+            col.appendChild(pair);
+          }
+        }
+
+        // Add region label on first column
+        if (r === 0) {
+          const label = document.createElement('div');
+          label.style.cssText = 'text-align:center; font-weight:800; font-size:11px; margin-bottom:2px; color:#555;';
+          label.textContent = regionName;
+          col.insertBefore(label, col.firstChild);
+        }
+
+        regionDiv.appendChild(col);
+      }
+
+      return regionDiv;
+    };
+
+    // Build left side (East + West)
+    const leftSide = document.createElement('div');
+    leftSide.style.cssText = 'display:flex; flex-direction:column; gap:8px;';
+    leftSide.appendChild(makeRegionBracket('East', 0));
+    leftSide.appendChild(makeRegionBracket('West', 1));
+
+    // Final Four + Championship center
+    const center = document.createElement('div');
+    center.style.cssText = 'display:flex; flex-direction:column; align-items:center; justify-content:center; min-width:140px; padding:0 8px;';
+
+    const ff1 = allRoundMatchups[4] ? allRoundMatchups[4][0] : null;
+    const ff2 = allRoundMatchups[4] ? allRoundMatchups[4][1] : null;
+    const ffWin1 = allRoundResults[4] ? allRoundResults[4][0] : null;
+    const ffWin2 = allRoundResults[4] ? allRoundResults[4][1] : null;
+    const champ = allRoundResults[5] ? allRoundResults[5][0] : null;
+
+    const ffLabel = document.createElement('div');
+    ffLabel.style.cssText = 'font-weight:900; font-size:12px; margin-bottom:8px; text-align:center;';
+    ffLabel.textContent = 'FINAL FOUR';
+    center.appendChild(ffLabel);
+
+    const makeFFSlot = (matchup, winner) => {
+      if (!matchup) return document.createElement('div');
+      const div = document.createElement('div');
+      div.style.cssText = 'margin:4px 0; border:1px solid #ccc; padding:3px; border-radius:4px;';
+
+      const sA = document.createElement('div');
+      sA.className = 'bracket-slot' + (winner && winner.name === matchup.teamA.name ? ' winner' : '');
+      sA.textContent = `(${matchup.teamA.seed}) ${matchup.teamA.name} ${matchup.teamA.emoji}`;
+      const sB = document.createElement('div');
+      sB.className = 'bracket-slot' + (winner && winner.name === matchup.teamB.name ? ' winner' : '');
+      sB.textContent = `(${matchup.teamB.seed}) ${matchup.teamB.name} ${matchup.teamB.emoji}`;
+      div.appendChild(sA);
+      div.appendChild(sB);
+      return div;
+    };
+
+    center.appendChild(makeFFSlot(ff1, ffWin1));
+    center.appendChild(makeFFSlot(ff2, ffWin2));
+
+    if (champ) {
+      const champDiv = document.createElement('div');
+      champDiv.className = 'bracket-champion';
+      champDiv.textContent = `CHAMPION: (${champ.seed}) ${champ.name} ${champ.emoji}`;
+      center.appendChild(champDiv);
+    }
+
+    // Build right side (South + Midwest)
+    const rightSide = document.createElement('div');
+    rightSide.style.cssText = 'display:flex; flex-direction:column; gap:8px;';
+    rightSide.appendChild(makeRegionBracket('South', 2));
+    rightSide.appendChild(makeRegionBracket('Midwest', 3));
+
+    wrapper.appendChild(leftSide);
+    wrapper.appendChild(center);
+    wrapper.appendChild(rightSide);
+    container.appendChild(wrapper);
+  };
+
+  // ===== INIT =====
+  showMatchup();
+})();
+</script>
+</body>
+</html>
